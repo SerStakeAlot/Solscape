@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solscape</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14110e;--panel:rgba(22,18,14,.92);--edge:#7a5a2c;--gold:#e9c264;--text:#efe4c9;--muted:#a6987c;--green:#5c9a44;--blood:#c0392b;--sol:#9945ff;--mint:#14f195;--focus:#ffd25f;--ink:#efe4c9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0c0a}}
+:root[data-theme="dark"]{--bg:#0e0c0a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:14px;overflow:hidden}
+#stage{position:fixed;inset:0}
+canvas.gl{display:block;width:100%;height:100%}
+.serif{font-family:Cinzel,Georgia,serif}
+#top{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(rgba(0,0,0,.75),rgba(0,0,0,0));pointer-events:none}
+#top *{pointer-events:auto}
+#top h1{margin:0;font-family:Cinzel,serif;font-weight:800;font-size:24px;letter-spacing:2px;color:var(--gold);text-shadow:0 2px 6px #000}
+#top h1 span{color:var(--mint)}
+#top .wallet{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:13px;text-shadow:0 1px 3px #000}
+.btn{background:linear-gradient(#8a6a34,#5b4120);color:var(--gold);border:1px solid #2a1a0c;padding:8px 14px;font-family:Cinzel,serif;font-weight:600;font-size:12px;letter-spacing:.5px;cursor:pointer;border-radius:4px;box-shadow:0 2px 0 #2a1a0c,inset 0 1px 0 rgba(255,255,255,.15)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sol{background:linear-gradient(#a45cff,#6e2fd6);color:#fff}.btn.green{background:linear-gradient(#6fb454,#3f7a2c);color:#fff}.btn.red{background:linear-gradient(#d4503f,#8f2419);color:#fff}
+.btn:focus-visible{outline:3px solid var(--focus)}
+#side{position:fixed;right:12px;top:64px;width:280px;background:var(--panel);border:2px solid var(--edge);border-radius:6px;backdrop-filter:blur(6px);max-height:calc(100vh - 230px);overflow:auto}
+.tabs{display:flex;border-bottom:2px solid var(--edge)}
+.tabs button{flex:1;background:transparent;color:var(--muted);border:0;padding:9px 4px;font-family:Cinzel,serif;font-weight:600;font-size:12px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--gold);background:rgba(233,194,100,.08)}
+.tab{padding:12px}
+.stat{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.stat b{font-variant-numeric:tabular-nums;color:var(--gold)}
+.bar{height:8px;background:#000;border-radius:2px;overflow:hidden;margin:3px 0 7px;border:1px solid #333}
+.bar i{display:block;height:100%;background:var(--green)}
+.bar.xp i{background:var(--sol)}.bar.foe i{background:var(--blood)}
+label{font-size:13px;display:block;margin-top:8px;color:var(--muted)}
+input[type=range]{width:100%}
+input[type=number],input[type=text],select{width:100%;padding:6px;font:inherit;border:1px solid var(--edge);border-radius:3px;background:#0b0907;color:var(--text)}
+.small{font-size:12px;color:var(--muted)}
+.pool{background:#000;padding:10px;border-radius:4px;margin-top:6px;border:1px solid #333}
+.pool .big{font-family:Cinzel,serif;font-weight:800;font-size:18px;color:var(--mint)}
+#chat{position:fixed;left:12px;bottom:12px;width:min(520px,calc(100vw - 24px));height:150px;background:var(--panel);border:2px solid var(--edge);border-radius:6px;padding:8px 10px;overflow-y:auto;font-size:13px;backdrop-filter:blur(6px)}
+#chat div{margin:2px 0}#chat .sys{color:var(--gold)}#chat .dmg{color:#ff8a7a}#chat .good{color:#8fe08a}#chat .sol{color:#cfa8ff}
+#help{position:fixed;left:12px;bottom:206px;font-size:12px;color:var(--muted);text-shadow:0 1px 3px #000;pointer-events:none}
+#hud{position:fixed;right:12px;bottom:12px;width:280px;background:var(--panel);border:2px solid var(--edge);border-radius:6px;padding:10px;display:none}
+#hud.on{display:block}
+#hud h3{margin:0 0 6px;font-family:Cinzel,serif;font-size:13px;color:var(--gold)}
+.f{font-size:12px;margin-top:4px}.f.dead{opacity:.4}
+.labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);font-size:11px;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;white-space:nowrap;text-align:center}
+.lbl .hp{width:44px;height:4px;background:#000;margin:2px auto 0;border:1px solid #222}.lbl .hp i{display:block;height:100%;background:#7ee787}
+.lbl.boss{font-family:Cinzel,serif;font-size:13px;color:#ff9a8a}
+.splat{position:absolute;transform:translate(-50%,-50%);font-family:Cinzel,serif;font-weight:800;font-size:15px;color:#fff;background:var(--blood);width:30px;height:30px;line-height:30px;text-align:center;border-radius:50%;box-shadow:0 0 0 2px #000;animation:rise .9s forwards}
+.splat.zero{background:#2b5fd9}.splat.heal{background:var(--green)}
+@keyframes rise{to{transform:translate(-50%,-160%);opacity:0}}
+@media (prefers-reduced-motion:reduce){.splat{animation:none}}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:12px}
+#modal.on{display:flex}
+#modal .box{background:var(--panel);border:2px solid var(--edge);border-radius:6px;padding:18px;width:100%;max-width:460px;max-height:92vh;overflow:auto}
+#modal h2{margin:0 0 8px;font-family:Cinzel,serif;font-size:18px;color:var(--gold)}
+#modal p{margin:8px 0;line-height:1.5}
+@media (max-width:820px){#side{width:220px;top:58px;max-height:40vh}#hud{width:220px}#chat{height:110px}}
+</style>
+</head>
+<body>
+<div id="stage"><canvas class="gl" id="gl" tabindex="0" aria-label="Solscape 3D world. WASD or click to move."></canvas></div>
+<div class="labels" id="labels"></div>
+<div id="top"><h1>SOL<span>SCAPE</span></h1><span class="small">Reward pool pays the fighters</span>
+  <div class="wallet"><span id="online" class="small" title="Players online">● offline</span><button class="btn" id="boardBtn">Leaderboard</button><button class="btn" id="profileBtn">Profile</button><span id="walletTag">No wallet</span><button class="btn sol" id="connectBtn">Connect wallet</button></div></div>
+<aside id="side">
+  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="stats">Stats</button><button role="tab" aria-selected="false" data-tab="combat">Combat</button><button role="tab" aria-selected="false" data-tab="token">Token</button></div>
+  <div class="tab" id="tab-stats"></div><div class="tab" id="tab-combat" hidden></div><div class="tab" id="tab-token" hidden></div>
+</aside>
+<div id="help">WASD or click the ground to move · click a goblin to fight · click the gold coin to trade · drag to orbit, scroll to zoom · E to eat</div>
+<div id="chat" aria-live="polite"></div><input id="chatIn" placeholder="Press Enter to chat with players online…" autocomplete="off" style="position:fixed;left:12px;bottom:168px;width:min(520px,calc(100vw - 24px));padding:7px 10px;font:inherit;background:var(--panel);border:2px solid var(--edge);border-radius:6px;color:var(--text);display:none">
+<div id="hud"></div>
+<div id="modal"><div class="box" id="box"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="net.js"></script>
+<script>
+// ================= economy =================
+const ECON={tradeFee:.05,toPool:.035,toTreasury:.015,bossPoolShare:.04,bossStake:50,pvpMin:100,pvpRake:.03,supply:1e9};
+const DEFAULT={wallet:null,sol:5,scape:0,pool:12500000,treasury:0,price:.0000042,hp:10,maxhp:10,food:5,style:'melee',
+ lv:{att:1,str:1,def:1,hp:10,rng:1,mag:1},xp:{att:0,str:0,def:0,hp:1154,rng:0,mag:0},kills:0,raids:{w:0,l:0},duels:{w:0,l:0},earned:0,name:'Adventurer',created:Date.now(),look:null};
+let S=load();
+function load(){try{const r=localStorage.getItem('solscape3d');return r?Object.assign({},DEFAULT,JSON.parse(r)):{...DEFAULT}}catch(e){return {...DEFAULT}}}
+function save(){try{localStorage.setItem('solscape3d',JSON.stringify(S))}catch(e){}if(window.NET)NET.dirty=true}
+const chat=document.getElementById('chat');
+function log(m,c=''){const d=document.createElement('div');if(c)d.className=c;d.textContent=m;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;while(chat.children.length>80)chat.removeChild(chat.firstChild)}
+function fmt(n){return Math.round(n).toLocaleString()}
+function lvlFor(xp){let p=0;for(let l=1;l<99;l++){p+=Math.floor(l+300*Math.pow(2,l/7));if(Math.floor(p/4)>xp)return l}return 99}
+function xpFor(l){let p=0;for(let i=1;i<l;i++)p+=Math.floor(i+300*Math.pow(2,i/7));return Math.floor(p/4)}
+function label(k){return {att:'Attack',str:'Strength',def:'Defence',hp:'Hitpoints',rng:'Ranged',mag:'Magic'}[k]}
+function gainXp(k,a){S.xp[k]+=a;const nl=lvlFor(S.xp[k]);if(nl>S.lv[k]){S.lv[k]=nl;log(`Congratulations, your ${label(k)} level is now ${nl}.`,'good');if(k==='hp')S.maxhp=nl;if(window.NET)NET.pushBoard()}}
+function combatLevel(){const L=S.lv;return Math.floor(.25*(L.def+L.hp)+Math.max(.325*(L.att+L.str),.325*Math.floor(1.5*L.rng),.325*Math.floor(1.5*L.mag)))}
+function styleBonus(a,d){const b={melee:'ranged',ranged:'magic',magic:'melee'};return b[a]===d?1.25:b[d]===a?.8:1}
+function offSkill(){return S.style==='melee'?'att':S.style==='ranged'?'rng':'mag'}
+function roll(a,d,m=1){a=(a+8)*m;d+=8;return Math.random()<(a>d?1-(d+2)/(2*(a+1)):a/(2*(d+1)))}
+function maxHit(){const b=S.style==='melee'?S.lv.str:S.style==='ranged'?S.lv.rng:S.lv.mag;return Math.floor(1.5+b*.6)}
+function playerHit(def,st='melee'){const m=styleBonus(S.style,st);if(!roll(S.lv[offSkill()],def,m))return 0;return Math.floor(Math.random()*Math.floor(maxHit()*m))+1}
+
+// ================= three.js world =================
+const cv=document.getElementById('gl');const modal=document.getElementById('modal'),box=document.getElementById('box'),hud=document.getElementById('hud');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9fc4e8);scene.fog=new THREE.Fog(0x9fc4e8,45,110);
+const camera=new THREE.PerspectiveCamera(50,1,.1,300);
+scene.add(new THREE.HemisphereLight(0xdfefff,0x4a6a2a,.75));
+const sun=new THREE.DirectionalLight(0xfff1d0,1.1);sun.position.set(30,50,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-60,right:60,top:60,bottom:-60,near:1,far:150});scene.add(sun);
+const W=90,H=60;
+function hgt(x,z){return Math.sin(x*.18)*.6+Math.cos(z*.22)*.5+Math.sin((x+z)*.09)*.8}
+// ground
+const gg=new THREE.PlaneGeometry(W,H,90,60);gg.rotateX(-Math.PI/2);
+{const p=gg.attributes.position,col=[];const c1=new THREE.Color(0x4f8a35),c2=new THREE.Color(0x6aa347),c3=new THREE.Color(0x8b7b45);
+ for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);let y=hgt(x,z);const onPath=Math.abs(z)<2.2&&x>-32&&x<30;if(inWater(x,z))y=-1.2;p.setY(i,y);const t=Math.random();const c=onPath?c3:c1.clone().lerp(c2,t);col.push(c.r,c.g,c.b)}
+ gg.setAttribute('color',new THREE.Float32BufferAttribute(col,3));gg.computeVertexNormals()}
+function inWater(x,z){return x>18&&x<34&&z<-6&&z>-22}
+const ground=new THREE.Mesh(gg,new THREE.MeshLambertMaterial({vertexColors:true}));ground.receiveShadow=true;scene.add(ground);
+const water=new THREE.Mesh(new THREE.PlaneGeometry(16,16),new THREE.MeshPhongMaterial({color:0x2f6fd6,transparent:true,opacity:.8,shininess:90}));water.rotation.x=-Math.PI/2;water.position.set(26,-.6,-14);scene.add(water);
+const obstacles=[];
+function tree(x,z,s=1){const g=new THREE.Group();const tr=new THREE.Mesh(new THREE.CylinderGeometry(.25*s,.4*s,1.6*s,6),new THREE.MeshLambertMaterial({color:0x6b4a2b}));tr.position.y=.8*s;tr.castShadow=true;g.add(tr);
+ for(let i=0;i<3;i++){const c=new THREE.Mesh(new THREE.ConeGeometry((1.6-i*.35)*s,1.6*s,7),new THREE.MeshLambertMaterial({color:i%2?0x2e7a2e:0x3a8f3a,flatShading:true}));c.position.y=(1.8+i*.9)*s;c.castShadow=true;g.add(c)}
+ g.position.set(x,hgt(x,z),z);g.rotation.y=Math.random()*6;scene.add(g);obstacles.push({x,z,r:.9*s})}
+function rock(x,z,s=1){const m=new THREE.Mesh(new THREE.DodecahedronGeometry(.9*s,0),new THREE.MeshLambertMaterial({color:0x777268,flatShading:true}));m.position.set(x,hgt(x,z)+.3,z);m.rotation.set(Math.random(),Math.random(),0);m.castShadow=true;scene.add(m);obstacles.push({x,z,r:.9*s})}
+const LM={arena:{x:-24,z:14},lair:{x:30,z:12},exchange:{x:22,z:14},spawn:{x:-10,z:2}};
+for(let i=0;i<120;i++){const x=(Math.random()-.5)*W*.96,z=(Math.random()-.5)*H*.96;if(inWater(x,z))continue;if(Math.abs(z)<3.5&&x>-33&&x<31)continue;if(Object.values(LM).some(l=>Math.hypot(l.x-x,l.z-z)<6))continue;Math.random()<.85?tree(x,z,.8+Math.random()*.7):rock(x,z,.6+Math.random()*.8)}
+for(let i=0;i<40;i++){const a=i/40*6.283;const r=i%2?W/2-1:H/2-1;const x=i%2?Math.cos(a)*(W/2-1):Math.cos(a)*(W/2-1);const z=Math.sin(a)*(H/2-1);tree(x,z,1.3)}
+// landmarks
+function pillar(x,z,color,h=2.2){const m=new THREE.Mesh(new THREE.CylinderGeometry(.35,.45,h,8),new THREE.MeshLambertMaterial({color}));m.position.set(x,hgt(x,z)+h/2,z);m.castShadow=true;scene.add(m);return m}
+{const a=LM.arena;for(let i=0;i<8;i++){const t=i/8*6.283;pillar(a.x+Math.cos(t)*4,a.z+Math.sin(t)*4,0x8f8a80,2)}
+ const fl=new THREE.Mesh(new THREE.CircleGeometry(4.2,24),new THREE.MeshLambertMaterial({color:0xa38f63}));fl.rotation.x=-Math.PI/2;fl.position.set(a.x,hgt(a.x,a.z)+.05,a.z);fl.receiveShadow=true;scene.add(fl);
+ const pole=pillar(a.x,a.z,0x3b2a14,5);pole.scale.set(.4,1,.4);const flag=new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.3),new THREE.MeshLambertMaterial({color:0xc0392b,side:THREE.DoubleSide}));flag.position.set(a.x+1.1,hgt(a.x,a.z)+4.3,a.z);scene.add(flag)}
+{const l=LM.lair;const cave=new THREE.Mesh(new THREE.SphereGeometry(5,10,8,0,6.283,0,1.6),new THREE.MeshLambertMaterial({color:0x3f3a35,flatShading:true}));cave.position.set(l.x+3,hgt(l.x,l.z)-.5,l.z);cave.castShadow=true;scene.add(cave);
+ for(let i=0;i<5;i++)rock(l.x-4+Math.random()*8,l.z-5+Math.random()*3,.6);
+ const sk=new THREE.Mesh(new THREE.SphereGeometry(.9,8,6),new THREE.MeshLambertMaterial({color:0xe8e0cc}));sk.position.set(l.x-2,hgt(l.x,l.z)+2.5,l.z-2);scene.add(sk);const spike=pillar(l.x-2,l.z-2,0x3b2a14,2.2);spike.scale.set(.25,1,.25)}
+{const e=LM.exchange;pillar(e.x,e.z,0x5b4120,1.8);const coin=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.25,20),new THREE.MeshPhongMaterial({color:0xe9c264,shininess:120,emissive:0x332200}));coin.rotation.z=Math.PI/2;coin.position.set(e.x,hgt(e.x,e.z)+3,e.z);scene.add(coin);LM.exchange.coin=coin}
+// ================= characters =================
+const MAT=c=>new THREE.MeshLambertMaterial({color:c});
+function limb(len,r1,r2,mat){const g=new THREE.Group();const c=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,len,10),mat);c.position.y=-len/2;const j=new THREE.Mesh(new THREE.SphereGeometry(r1*1.05,10,8),mat);g.add(j,c);return g}
+function torsoGeo(){
+ // profile from waist (y=0) to shoulder line (y=1.16); x = half-width; front/back depth applied via z-scale below
+ const pts=[[.21,0],[.26,.08],[.25,.3],[.27,.5],[.31,.72],[.35,.92],[.36,1.04],[.31,1.12],[.15,1.18]].map(p=>new THREE.Vector2(p[0],p[1]));
+ const g=new THREE.LatheGeometry(pts,18);
+ // flatten and give the chest a slight V: widen across x near the top, squash z, pull the back flatter than the front
+ const p=g.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i);const t=y/1.18;p.setX(i,x*(1+t*.1));p.setZ(i,z*(z>0?.62:.5))}
+ g.computeVertexNormals();return g}
+function boot(mat){const g=new THREE.Group();const shin=new THREE.Mesh(new THREE.CylinderGeometry(.12,.14,.32,10),mat);shin.position.y=-.86;
+ const foot=new THREE.Mesh(new THREE.SphereGeometry(.14,10,8),mat);foot.scale.set(.9,.5,1.7);foot.position.set(0,-1.0,.1);
+ const heel=new THREE.Mesh(new THREE.SphereGeometry(.11,8,8),mat);heel.scale.set(.9,.6,.9);heel.position.set(0,-.99,-.1);
+ const sole=new THREE.Mesh(new THREE.BoxGeometry(.24,.05,.46),MAT(0x1b120a));sole.position.set(0,-1.06,.06);g.add(shin,foot,heel,sole);return g}
+
+function sculptHead(skin,hair,eyes,style){
+ const R=.28,geo=new THREE.SphereGeometry(R,72,54),p=geo.attributes.position,col=[];
+ const cS=new THREE.Color(skin),cH=new THREE.Color(hair),cLip=cS.clone().lerp(new THREE.Color(0xb85c56),.45),cDark=cS.clone().multiplyScalar(.62);
+ const tmp=new THREE.Vector3(),c=new THREE.Vector3();
+ const G=(n,x,y,z,w)=>{c.set(x,y,z).normalize();return Math.exp(-n.distanceToSquared(c)/w)};
+ const cInk=new THREE.Color(0x1e1712);
+ // painted strokes: sample points along a curve and take the closest gaussian
+ const stroke=(n,pts,w)=>{let m=0;for(const q of pts)m=Math.max(m,G(n,q[0],q[1],q[2],w));return m};
+ const arc=(cx,cy,r,bend,k)=>{const o=[];for(let i=0;i<=k;i++){const t=-1+2*i/k;o.push([cx+r*t,cy+bend*(1-t*t),1])}return o};
+ const mouthPts=arc(0,-.42,.16,-.05,12);           // gentle smile
+ const browL=arc(-.3,.36,.09,.03,6),browR=arc(.3,.36,.09,.03,6);
+ for(let i=0;i<p.count;i++){const n=tmp.set(p.getX(i),p.getY(i),p.getZ(i)).normalize().clone();let d=0;
+  d+=.04*G(n,0,-.86,.52,.1);                                  // soft chin
+  d+=.02*(G(n,-.62,-.66,.42,.09)+G(n,.62,-.66,.42,.09));      // jaw
+  d-=.02*(G(n,-.95,.35,.25,.12)+G(n,.95,.35,.25,.12));        // temples
+  d+=.045*G(n,0,-.12,1,.012);                                  // small round nose bump
+  let x=n.x*(R+d),y=n.y*(R+d),z=n.z*(R+d);
+  x*=.88;y*=y>0?1.08:1.16;z*=z>0?.98:.9;
+  p.setXYZ(i,x,y,z);
+  const cc=cS.clone();
+  const eye=Math.min(1,(G(n,-.3,.12,.95,.0035)+G(n,.3,.12,.95,.0035))*1.4);cc.lerp(cInk,eye);          // dot eyes
+  const brow=Math.min(1,(stroke(n,browL,.0012)+stroke(n,browR,.0012))*1.3);cc.lerp(cH,brow*.9);          // brow strokes
+  const mouth=Math.min(1,stroke(n,mouthPts,.0009)*1.4);cc.lerp(cInk,mouth*.85);                          // mouth line
+  const noseL=Math.min(1,stroke(n,[[.02,-.03,1],[.03,-.09,1],[.04,-.15,1],[.02,-.19,1],[-.02,-.2,1]],.0006)*1.3);cc.lerp(cDark,noseL*.55); // subtle L nose line
+  col.push(cc.r,cc.g,cc.b)}
+ geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));geo.computeVertexNormals();
+ const group=new THREE.Group();const head=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));group.add(head);
+ // ears: soft ellipsoids half embedded
+ const skinM=MAT(skin);[-1,1].forEach(sd=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.05,12,10),skinM);e.scale.set(.4,1,.7);e.position.set(sd*.235,-.01,-.02);group.add(e)});
+ // hair: sculpted cap with swept fringe volume
+ let hairMesh;
+ if(style==='bald'){hairMesh=new THREE.Group()}
+ else{const th=style==='long'?2.25:style==='mohawk'?.9:1.6;const hg=new THREE.SphereGeometry(R+.015,64,40,0,6.283,0,th),hp=hg.attributes.position;
+  for(let i=0;i<hp.count;i++){const n=tmp.set(hp.getX(i),hp.getY(i),hp.getZ(i)).normalize().clone();let d=0;
+   if(style==='mohawk'){d+=.12*G(n,0,.98,.1,.02)*Math.max(0,1-Math.abs(n.x)*6)}
+   else{d+=.05*G(n,.15,.8,.58,.1)+.035*G(n,-.2,.75,.6,.1);d+=.04*G(n,0,.55,.82,.05);d+=.03*(G(n,-.9,.3,.3,.15)+G(n,.9,.3,.3,.15))}
+   if(style==='long'){d+=.05*(G(n,-.7,-.3,-.5,.2)+G(n,.7,-.3,-.5,.2))}
+   let x=n.x*(R+.015+d),y=n.y*(R+.015+d)+.01,z=n.z*(R+.015+d);x*=.87;y*=y>0?1.1:1.22;z*=z>0?.99:.92;
+   if(style!=='mohawk'&&n.y>.55&&n.z>.3)x+=.035*n.z; // sweep fringe to one side
+   hp.setXYZ(i,x,y,z)}
+  hg.computeVertexNormals();hairMesh=new THREE.Mesh(hg,MAT(hair));hairMesh.position.y=.04;
+  if(style==='ponytail'){const tail=new THREE.Mesh(new THREE.CylinderGeometry(.06,.025,.62,10),MAT(hair));tail.position.set(0,-.22,-.3);tail.rotation.x=.35;hairMesh.add(tail);const knot=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),MAT(hair));knot.position.set(0,.06,-.27);hairMesh.add(knot)}}
+ group.add(hairMesh);group.traverse(o=>{o.castShadow=true});
+ return {group,hair:hairMesh,head}}
+function humanoid({skin=0xe3b48c,shirt=0x2d5aa8,pants=0x3d3229,hair=0x4a2f16,hairStyle='short',eyes=0x3b2a1a,cape=null,helm=false,scale=1,weapon='sword'}){const g=new THREE.Group();const S_=MAT(skin),SH=MAT(shirt),PA=MAT(pants);
+ const torso=new THREE.Mesh(torsoGeo(),SH);torso.position.y=.96;
+ const belt=new THREE.Mesh(new THREE.TorusGeometry(.25,.04,6,18),MAT(0x5a3a1a));belt.rotation.x=Math.PI/2;belt.position.y=1.02;belt.scale.set(1.05,.62,1);
+ const buckle=new THREE.Mesh(new THREE.BoxGeometry(.1,.08,.04),MAT(0xc9a227));buckle.position.set(0,1.02,.18);
+ const hips=new THREE.Mesh(new THREE.SphereGeometry(.3,12,10),PA);hips.scale.set(.95,.55,.62);hips.position.y=.92;
+ const neck=new THREE.Mesh(new THREE.CylinderGeometry(.1,.14,.26,14),S_);neck.position.y=2.2;
+ const HEAD=sculptHead(skin,hair,eyes,hairStyle);HEAD.group.position.set(0,2.52,0);g.add(neck,HEAD.group);const hr=HEAD.hair;
+ g.add(torso,belt,buckle,hips);
+ if(helm){const steel=new THREE.MeshStandardMaterial({color:0x9aa3ad,metalness:.7,roughness:.35});const h=new THREE.Mesh(new THREE.SphereGeometry(.315,24,16,0,6.283,0,1.95),steel);h.scale.set(.9,1.1,.98);h.position.set(0,.06,-.01);const nose=new THREE.Mesh(new THREE.BoxGeometry(.05,.28,.04),steel);nose.position.set(0,-.08,.3);const rim=new THREE.Mesh(new THREE.TorusGeometry(.29,.02,8,24),steel);rim.rotation.x=Math.PI/2;rim.position.y=-.1;rim.scale.set(.92,1,1);HEAD.group.add(h,nose,rim);hr.visible=false}
+ // shoulders: flattened pauldrons sitting on the shoulder line
+ const collar=new THREE.Mesh(new THREE.CylinderGeometry(.17,.2,.14,12,1,true),new THREE.MeshLambertMaterial({color:shirt,side:THREE.DoubleSide}));collar.position.y=2.14;g.add(collar);
+ const pad=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),SH);pad.scale.set(1,.65,.9);pad.position.set(-.37,2.04,0);const pad2=pad.clone();pad2.position.x=.47;g.add(pad,pad2);
+ const armL=limb(.82,.09,.07,S_);armL.position.set(-.4,1.98,0);const sleeveL=new THREE.Mesh(new THREE.CylinderGeometry(.115,.1,.38,12),SH);sleeveL.position.y=-.19;armL.add(sleeveL);const shL=new THREE.Mesh(new THREE.SphereGeometry(.125,14,10),SH);shL.scale.set(1,.85,.9);shL.position.y=.02;armL.add(shL);
+ const handL=new THREE.Mesh(new THREE.SphereGeometry(.085,8,8),S_);handL.scale.set(.8,1.1,.7);handL.position.y=-.86;armL.add(handL);
+ const armR=limb(.82,.09,.07,S_);armR.position.set(.4,1.98,0);armR.add(sleeveL.clone(),handL.clone(),shL.clone());
+ // legs with hip pivots, knees and shaped boots
+ const legL=limb(.7,.13,.1,PA);legL.position.set(-.16,.9,0);const legR=limb(.7,.13,.1,PA);legR.position.set(.16,.9,0);
+ [legL,legR].forEach(l=>{const knee=new THREE.Mesh(new THREE.SphereGeometry(.1,8,8),PA);knee.position.y=-.7;l.add(knee);l.add(boot(MAT(0x2b1c10)))});
+ g.add(armL,armR,legL,legR);
+ if(cape){const cp=new THREE.Mesh(new THREE.PlaneGeometry(.62,1.45,1,4),new THREE.MeshLambertMaterial({color:cape,side:THREE.DoubleSide}));cp.position.set(0,1.42,-.26);cp.rotation.x=.12;g.add(cp);g.userData.cape=cp}
+ const wpn=new THREE.Group();
+ if(weapon==='sword'){const steel=new THREE.MeshStandardMaterial({color:0xd7dde5,metalness:.8,roughness:.3});const bl=new THREE.Mesh(new THREE.BoxGeometry(.07,1.05,.16),steel);bl.position.y=.6;const tip=new THREE.Mesh(new THREE.ConeGeometry(.08,.2,4),steel);tip.position.y=1.22;tip.rotation.y=.78;const guard=new THREE.Mesh(new THREE.BoxGeometry(.32,.06,.08),MAT(0xc9a227));guard.position.y=.08;const grip=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.22,6),MAT(0x3b2410));grip.position.y=-.06;wpn.add(bl,tip,guard,grip)}
+ else if(weapon==='bow'){const bw=new THREE.Mesh(new THREE.TorusGeometry(.6,.035,6,20,3.0),MAT(0x6b4a2b));bw.rotation.z=-1.57;bw.rotation.y=1.57;const str=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,1.18,4),MAT(0xdddddd));wpn.add(bw,str)}
+ else{const st=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,1.5,8),MAT(0x5a3a1a));st.position.y=.35;const orb=new THREE.Mesh(new THREE.SphereGeometry(.14,10,10),new THREE.MeshPhongMaterial({color:0xa66bff,emissive:0x5a1fd0}));orb.position.y=1.15;const claw=new THREE.Mesh(new THREE.TorusGeometry(.18,.03,6,12,3.4),MAT(0xc9a227));claw.position.y=1.15;claw.rotation.z=1.57;wpn.add(st,orb,claw)}
+ wpn.position.set(0,-.86,.1);armR.add(wpn);
+ g.traverse(o=>{o.castShadow=true});g.scale.setScalar(scale);g.userData=Object.assign(g.userData,{armR,armL,legL,legR,wpn});return g}
+function goblinMesh(){const g=humanoid({skin:0x5f9e3c,shirt:0x6b4a2b,pants:0x3d2b16,hair:0x3d7a28,scale:.72,weapon:'sword'});
+ const ear=new THREE.Mesh(new THREE.ConeGeometry(.09,.4,6),MAT(0x5f9e3c));ear.rotation.z=1.4;ear.position.set(-.4,2.6,0);const ear2=ear.clone();ear2.rotation.z=-1.4;ear2.position.x=.4;g.add(ear,ear2);
+ g.children.forEach(c=>{if(c.type==='Group'&&Math.abs(c.position.y-2.52)<.01)c.scale.multiplyScalar(1.22)});return g}
+function bossMesh(){const g=new THREE.Group();const M=MAT(0xa5301f);const body=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,8),M);body.scale.set(1.4,1,1);body.position.y=2.4;
+ const neck=new THREE.Mesh(new THREE.CylinderGeometry(.6,.9,2.2,8),M);neck.position.set(2.6,3.6,0);neck.rotation.z=-.7;const head=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.1,1.1),M);head.position.set(3.7,4.6,0);
+ const eye=new THREE.Mesh(new THREE.SphereGeometry(.15,6,6),new THREE.MeshPhongMaterial({color:0xffee55,emissive:0xffaa00}));eye.position.set(4.3,4.8,.4);const eye2=eye.clone();eye2.position.z=-.4;
+ const tail=new THREE.Mesh(new THREE.ConeGeometry(.7,4,7),M);tail.rotation.z=1.4;tail.position.set(-4.2,2.2,0);
+ const wingG=new THREE.PlaneGeometry(4,2.4);const wm=new THREE.MeshLambertMaterial({color:0x5e1a12,side:THREE.DoubleSide});const w1=new THREE.Mesh(wingG,wm);w1.position.set(0,3.6,2.6);w1.rotation.x=-.5;const w2=new THREE.Mesh(wingG,wm);w2.position.set(0,3.6,-2.6);w2.rotation.x=.5;
+ for(let i=0;i<4;i++){const lg=new THREE.Mesh(new THREE.CylinderGeometry(.35,.45,1.6,6),M);lg.position.set(i<2?1.4:-1.4,.8,i%2?1.3:-1.3);g.add(lg)}
+ g.add(body,neck,head,eye,eye2,tail,w1,w2);g.traverse(o=>{o.castShadow=true});g.userData={w1,w2,head};return g}
+// entities
+const LOOK={skin:[0xf5d5b8,0xe3b48c,0xc68f5e,0x9c6a3f,0x6b4429,0x40281a],hair:[0x1a1410,0x4a2f16,0x8b5a2b,0xc98a3a,0xe8d08a,0xb03a2a,0x9a9a9a,0x7a3fd1],
+ hairStyle:['short','long','ponytail','mohawk','bald'],eyes:[0x3b2a1a,0x2f6fd6,0x3d7a2a,0x777],shirt:[0x2f4f8f,0xc0392b,0x2e7d32,0x6a1b9a,0x8a6a34,0x2b2b2b,0xd35400,0x117a8b],cape:[0x8e1b12,0x1b3d8e,0x2e7d32,0x6a1b9a,0x2b2b2b,null]};
+const DEFAULT_LOOK={skin:1,hair:1,hairStyle:0,eyes:0,shirt:0,cape:0};
+function lookOpts(){const l=S.look||DEFAULT_LOOK;return {skin:LOOK.skin[l.skin],hair:LOOK.hair[l.hair],hairStyle:LOOK.hairStyle[l.hairStyle],eyes:LOOK.eyes[l.eyes],shirt:LOOK.shirt[l.shirt],cape:LOOK.cape[l.cape]}}
+const player={mesh:null,x:LM.spawn.x,z:LM.spawn.z,tx:null,tz:null,dir:0,name:'You'};
+function buildPlayer(){if(player.mesh)scene.remove(player.mesh);const w=S.style==='melee'?'sword':S.style==='ranged'?'bow':'staff';player.mesh=humanoid(Object.assign(lookOpts(),{weapon:w}));scene.add(player.mesh)}
+buildPlayer();
+const marker=new THREE.Mesh(new THREE.RingGeometry(.35,.55,16),new THREE.MeshBasicMaterial({color:0xffd25f,side:THREE.DoubleSide}));marker.rotation.x=-Math.PI/2;marker.visible=false;scene.add(marker);
+const goblins=[];function spawnGoblin(){for(let i=0;i<50;i++){const x=(Math.random()-.5)*60,z=(Math.random()-.5)*36;if(inWater(x,z)||blocked(x,z)||Math.hypot(x-player.x,z-player.z)<8||Object.values(LM).some(l=>Math.hypot(l.x-x,l.z-z)<7))continue;const g={mesh:goblinMesh(),x,z,tx:x,tz:z,hp:5,max:5,name:'Goblin',wait:0};scene.add(g.mesh);goblins.push(g);return}}
+for(let i=0;i<7;i++)spawnGoblin();
+function blocked(x,z){return obstacles.some(o=>Math.hypot(o.x-x,o.z-z)<o.r+.45)||Math.abs(x)>W/2-2||Math.abs(z)>H/2-2||inWater(x,z)}
+function place(e){e.mesh.position.set(e.x,hgt(e.x,e.z),e.z)}
+// labels
+const labels=document.getElementById('labels');const lblMap=new Map();
+function labelFor(e,cls=''){let el=lblMap.get(e);if(!el){el=document.createElement('div');el.className='lbl '+cls;el.innerHTML=`<span></span><div class="hp"><i></i></div>`;labels.appendChild(el);lblMap.set(e,el)}return el}
+function dropLabel(e){const el=lblMap.get(e);if(el){el.remove();lblMap.delete(e)}}
+const v=new THREE.Vector3();
+function project(x,y,z){v.set(x,y,z).project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight,v.z<1]}
+function splat(e,d,h=2.4){const [sx,sy]=project(e.x,hgt(e.x,e.z)+h,e.z);const s=document.createElement('div');s.className='splat'+(d===0?' zero':'')+(d==='+'?' heal':'');s.textContent=d;s.style.left=sx+'px';s.style.top=sy+'px';labels.appendChild(s);setTimeout(()=>s.remove(),900)}
+// ================= camera / input =================
+let camYaw=-.6,camPitch=.55,camDist=16,drag=null;
+cv.addEventListener('mousedown',e=>{drag={x:e.clientX,y:e.clientY,moved:false}});modal.addEventListener('mousedown',e=>{if(e.target===modal)drag={x:e.clientX,y:e.clientY,moved:false,fromModal:true}});
+addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;camYaw-=dx*.006;camPitch=Math.max(.2,Math.min(1.3,camPitch+dy*.005));drag.x=e.clientX;drag.y=e.clientY});
+addEventListener('mouseup',e=>{if(drag&&!drag.moved&&e.target===cv)clickWorld(e.clientX,e.clientY);drag=null});
+cv.addEventListener('wheel',e=>{camDist=Math.max(7,Math.min(34,camDist+e.deltaY*.02));e.preventDefault()},{passive:false});
+cv.addEventListener('touchstart',e=>{const t=e.touches[0];drag={x:t.clientX,y:t.clientY,moved:false}},{passive:true});
+cv.addEventListener('touchmove',e=>{const t=e.touches[0];if(!drag)return;const dx=t.clientX-drag.x,dy=t.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>6)drag.moved=true;camYaw-=dx*.008;camPitch=Math.max(.2,Math.min(1.3,camPitch+dy*.006));drag.x=t.clientX;drag.y=t.clientY},{passive:true});
+cv.addEventListener('touchend',e=>{if(drag&&!drag.moved){const t=e.changedTouches[0];clickWorld(t.clientX,t.clientY)}drag=null});
+const ray=new THREE.Raycaster();
+function clickWorld(cx,cy){if(B)return;ray.setFromCamera({x:cx/innerWidth*2-1,y:-(cy/innerHeight)*2+1},camera);
+ const gob=ray.intersectObjects(goblins.map(g=>g.mesh),true)[0];if(gob){const g=goblins.find(g=>g.mesh===gob.object.parent||g.mesh.children.includes(gob.object));if(g){fightTarget=g;player.tx=null;return}}
+ if(ray.intersectObject(LM.exchange.coin)[0]){openExchange();return}
+ const h=ray.intersectObject(ground)[0];if(h){player.tx=h.point.x;player.tz=h.point.z;fighting=null;fightTarget=null;marker.position.set(h.point.x,hgt(h.point.x,h.point.z)+.05,h.point.z);marker.visible=true}}
+const keys={};addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;const k=e.key.toLowerCase();keys[k]=true;if(k==='e'){e.preventDefault();eat()}if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)&&document.activeElement===cv)e.preventDefault()});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+function eat(){if(S.food<=0){log('You have no food.');return}if(S.hp>=S.maxhp){log('You are already at full health.');return}S.food--;S.hp=Math.min(S.maxhp,S.hp+Math.ceil(S.maxhp*.4));if(B)B.party[0].hp=S.hp;splat(player,'+');log('You eat a lobster.','good');ui()}
+// ================= movement & world sim =================
+let fighting=null,fightTarget=null,near=null,t0=performance.now(),tick=0,lastTick=0;
+function tryMove(e,dx,dz,sp){const nx=e.x+dx*sp,nz=e.z+dz*sp;if(!blocked(nx,e.z))e.x=nx;if(!blocked(e.x,nz))e.z=nz;if(dx||dz)e.dir=Math.atan2(dx,dz)}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-t0)/1000);t0=now;const time=now/1000;
+ if(!B){let dx=0,dz=0;const f=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw)),r=new THREE.Vector3(-f.z,0,f.x);
+  if(keys.w||keys.arrowup){dx+=f.x;dz+=f.z}if(keys.s||keys.arrowdown){dx-=f.x;dz-=f.z}if(keys.a||keys.arrowleft){dx-=r.x;dz-=r.z}if(keys.d||keys.arrowright){dx+=r.x;dz+=r.z}
+  let moving=false;if(dx||dz){const l=Math.hypot(dx,dz);tryMove(player,dx/l,dz/l,6*dt);player.tx=null;marker.visible=false;fighting=null;moving=true}
+  else if(fightTarget){const d=Math.hypot(fightTarget.x-player.x,fightTarget.z-player.z);if(d>1.4){tryMove(player,(fightTarget.x-player.x)/d,(fightTarget.z-player.z)/d,6*dt);moving=true}else{fighting=fightTarget;fightTarget=null}}
+  else if(player.tx!==null){const d=Math.hypot(player.tx-player.x,player.tz-player.z);if(d<.2){player.tx=null;marker.visible=false}else{tryMove(player,(player.tx-player.x)/d,(player.tz-player.z)/d,6*dt);moving=true}}
+  if(fighting){player.dir=Math.atan2(fighting.x-player.x,fighting.z-player.z)}
+  walkAnim(player.mesh,moving,time);
+  // landmarks
+  const nr=Object.entries(LM).find(([k,l])=>k!=='spawn'&&Math.hypot(l.x-player.x,l.z-player.z)<3.2);const nk=nr?nr[0]:null;
+  if(nk!==near){near=nk;if(nk==='arena')openPvpSetup();if(nk==='lair')openRaidSetup();if(nk==='exchange')openExchange()}
+  goblins.forEach(g=>{if(g===fighting){g.dir=Math.atan2(player.x-g.x,player.z-g.z);return}const d=Math.hypot(g.tx-g.x,g.tz-g.z);if(d<.3){if(g.wait>0)g.wait-=dt;else{g.tx=g.x+(Math.random()-.5)*8;g.tz=g.z+(Math.random()-.5)*8;g.wait=1+Math.random()*3}}else tryMove(g,(g.tx-g.x)/d,(g.tz-g.z)/d,2*dt);walkAnim(g.mesh,d>.3,time)});
+  if(now-lastTick>600){lastTick=now;worldTick()}
+ } else if(now-lastTick>650){lastTick=now;battleTick()}
+ // animate
+ place(player);player.mesh.rotation.y=player.dir;goblins.forEach(g=>{place(g);g.mesh.rotation.y=g.dir||0});
+ if(B){B.foes.forEach(f=>{place(f);f.mesh.rotation.y=Math.atan2(player.x-f.x,player.z-f.z);if(f.mesh.userData.w1){f.mesh.userData.w1.rotation.x=-.5+Math.sin(time*3)*.4;f.mesh.userData.w2.rotation.x=.5-Math.sin(time*3)*.4;f.mesh.position.y+=Math.sin(time*2)*.15}});B.party.slice(1).forEach(p=>{place(p);p.mesh.rotation.y=Math.atan2(B.foes[0].x-p.x,B.foes[0].z-p.z)});player.dir=Math.atan2(B.foes[0].x-player.x,B.foes[0].z-player.z)}
+ lunges.forEach(l=>{const k=(now-l.t)/250;if(k>1){l.mesh.position.copy(l.base);}else{l.mesh.position.copy(l.base).addScaledVector(l.dirv,Math.sin(k*Math.PI)*.6)}});lunges=lunges.filter(l=>now-l.t<260);
+ LM.exchange.coin.rotation.y+=dt*1.2;NET.tickPeers(dt,time);
+ // camera
+ const cx=player.x+Math.sin(camYaw)*Math.cos(camPitch)*camDist,cz=player.z+Math.cos(camYaw)*Math.cos(camPitch)*camDist,cy=hgt(player.x,player.z)+Math.sin(camPitch)*camDist+1;
+ camera.position.lerp(new THREE.Vector3(cx,cy,cz),.15);camera.lookAt(player.x,hgt(player.x,player.z)+1.5,player.z);
+ renderer.render(scene,camera);updateLabels()}
+let lunges=[];
+function walkAnim(m,moving,t){const u=m.userData;const a=moving?Math.sin(t*9)*.7:0;u.armL.rotation.x=a;u.armR.rotation.x=-a*.6;u.legL.rotation.x=-a;u.legR.rotation.x=a;if(u.cape)u.cape.rotation.x=.12+(moving?.35+Math.sin(t*9)*.08:Math.sin(t*1.5)*.03)}function lunge(e,toward){if(e.mesh.userData.armR){const ar=e.mesh.userData.armR;ar.rotation.x=-2.2;setTimeout(()=>{ar.rotation.x=0},220)}const dx=toward.x-e.x,dz=toward.z-e.z,l=Math.hypot(dx,dz)||1;lunges.push({mesh:e.mesh,base:new THREE.Vector3(e.x,hgt(e.x,e.z),e.z),dirv:new THREE.Vector3(dx/l,0,dz/l),t:performance.now()})}
+function updateLabels(){const ents=[player,...goblins,...[...NET.peers.values()].filter(e=>e.mesh),...(B?[...B.foes,...B.party.slice(1)]:[])];ents.forEach(e=>{const el=labelFor(e,e.boss?'boss':'');const h=e.boss?6.5:e.name==='Goblin'?2.2:2.6;const [x,y,vis]=project(e.x,hgt(e.x,e.z)+h,e.z);el.style.display=vis?'':'none';el.style.left=x+'px';el.style.top=y+'px';const hp=e===player?S.hp:e.hp,mx=e===player?S.maxhp:e.max;el.firstChild.textContent=e===player?`${S.name} (lvl ${combatLevel()})`:e.name+(e.lvl?` (lvl ${e.lvl})`:'');el.querySelector('.hp i').style.width=Math.max(0,100*hp/mx)+'%'})}
+function worldTick(){tick++;if(fighting){const g=fighting;const d=playerHit(2);lunge(player,g);g.hp-=d;splat(g,d,2);log(d?`You hit the goblin for ${d}.`:'You miss the goblin.',d?'dmg':'');if(d){gainXp(offSkill(),d*4);gainXp('hp',Math.ceil(d*1.3))}
+  if(g.hp<=0){scene.remove(g.mesh);dropLabel(g);goblins.splice(goblins.indexOf(g),1);fighting=null;S.kills++;const drop=Math.floor(5+Math.random()*20);S.scape+=drop;log(`The goblin dies. It drops ${drop} SCAPE.`,'good');setTimeout(spawnGoblin,3000)}
+  else{const gd=roll(3,S.lv.def)?Math.floor(Math.random()*2)+1:0;lunge(g,player);splat(player,gd);if(gd){S.hp-=gd;log(`The goblin hits you for ${gd}.`,'dmg');if(S.hp<=0)die()}}
+  ui()}else if(tick%5===0&&S.hp<S.maxhp){S.hp++;ui()}save()}
+function die(){S.hp=S.maxhp;player.x=LM.spawn.x;player.z=LM.spawn.z;fighting=null;player.tx=null;log('Oh dear, you are dead! You respawn at Solbridge.','sys')}
+// ================= raids & duels =================
+
+const NAMES=['Zezima_sol','Durial_9','Wyrmbait','Lumby_Larry','ghostslayer','Falador_Fred','Bonesaw','Varrock_Vic'];
+function openRaidSetup(){box.innerHTML=`<h2>The Solstice Wyrm</h2><p>Raid the wyrm with 2–4 players. Everyone stakes <b>${ECON.bossStake} SCAPE</b>. Win and the party splits the stakes plus <b>${ECON.bossPoolShare*100}% of the reward pool</b> (${fmt(S.pool*ECON.bossPoolShare)} SCAPE right now). Wipe and the stakes go to the pool.</p>
+ <label>Party size <select id="psize"><option>2</option><option selected>3</option><option>4</option></select></label><p class="small">Wyrm health scales with the party. Press E to eat mid-fight.</p>
+ <button class="btn green" id="go">Enter the lair</button> <button class="btn" id="cancel">Walk away</button>`;modal.classList.add('on');
+ box.querySelector('#cancel').onclick=closeModal;box.querySelector('#go').onclick=()=>{if(!S.wallet){log('Connect a wallet first.','sys');return}if(S.scape<ECON.bossStake){log(`You need ${ECON.bossStake} SCAPE to stake.`,'sys');return}modal.classList.remove('on');startRaid(+box.querySelector('#psize').value)}}
+function openPvpSetup(){box.innerHTML=`<h2>Duel arena</h2><p>Wager SCAPE against another player. Winner takes the pot minus a ${ECON.pvpRake*100}% arena fee that returns to the reward pool. Minimum ${ECON.pvpMin} SCAPE.</p>
+ <label>Your wager <input type="number" id="wager" min="${ECON.pvpMin}" step="10" value="${Math.max(ECON.pvpMin,Math.floor(S.scape/4/10)*10)}"></label>
+ <label>Combat style <select id="pstyle"><option value="melee">Melee</option><option value="ranged">Ranged</option><option value="magic">Magic</option></select></label><p class="small">You hold ${fmt(S.scape)} SCAPE. Opponents are matched near your combat level.</p>
+ <button class="btn red" id="go">Find an opponent</button> <button class="btn" id="cancel">Walk away</button>`;modal.classList.add('on');box.querySelector('#pstyle').value=S.style;
+ box.querySelector('#cancel').onclick=closeModal;box.querySelector('#go').onclick=()=>{const w=Math.floor(+box.querySelector('#wager').value);if(!S.wallet){log('Connect a wallet first.','sys');return}if(w<ECON.pvpMin){log(`Minimum wager is ${ECON.pvpMin}.`,'sys');return}if(w>S.scape){log('You cannot wager more than you hold.','sys');return}S.style=box.querySelector('#pstyle').value;setWeapon();modal.classList.remove('on');startDuel(w)}}
+function openExchange(){const mc=(S.price*ECON.supply).toFixed(0);box.innerHTML=`<h2>Grand Exchange</h2>
+ <div class="pool"><div class="small">Reward pool</div><div class="big">${fmt(S.pool)} SCAPE</div><div class="small">Price ${S.price.toFixed(7)} SOL · sim. mcap ${mc} SOL · treasury ${fmt(S.treasury)}</div></div>
+ <p class="small">You hold <b style="color:var(--gold)">${S.sol.toFixed(3)} SOL</b> and <b style="color:var(--gold)">${fmt(S.scape)} SCAPE</b>. Every trade pays ${ECON.tradeFee*100}%: ${ECON.toPool*100}% to the reward pool, ${ECON.toTreasury*100}% to treasury.</p>
+ <label>Buy with SOL: <span id="xbv">0.25</span><input type="range" id="xbuyR" min="0.05" max="2" step="0.05" value="0.25"></label><button class="btn sol" id="xbuy">Buy SCAPE</button>
+ <label>Sell SCAPE <input type="number" id="xsellN" min="1" value="${Math.floor(S.scape/2)||0}"></label><p><button class="btn" id="xsell">Sell SCAPE</button> <button class="btn" id="cancel">Leave</button></p>
+ ${S.wallet?'':'<p class="small" style="color:#ff8a7a">Connect a wallet (top right) before trading.</p>'}`;modal.classList.add('on');
+ const br=box.querySelector('#xbuyR');br.oninput=()=>box.querySelector('#xbv').textContent=br.value;
+ box.querySelector('#xbuy').onclick=()=>{trade('buy',+br.value);openExchange()};
+ box.querySelector('#xsell').onclick=()=>{trade('sell',Math.floor(+box.querySelector('#xsellN').value));openExchange()};
+ box.querySelector('#cancel').onclick=closeModal}
+function swatches(key,vals,cur,isStyle){return vals.map((v,i)=>isStyle?`<button class="btn ${i===cur?'green':''}" data-k="${key}" data-i="${i}" style="text-transform:capitalize">${v}</button>`:`<button data-k="${key}" data-i="${i}" title="${v===null?'None':''}" style="width:30px;height:30px;border-radius:50%;margin:3px;cursor:pointer;border:3px solid ${i===cur?'var(--gold)':'#222'};background:${v===null?'transparent':'#'+v.toString(16).padStart(6,'0')};${v===null?'background:repeating-linear-gradient(45deg,#333 0 4px,#111 4px 8px)':''}"></button>`).join('')}
+function openCreator(first){if(!S.look)S.look={...DEFAULT_LOOK};const l=S.look;camDist=8;camPitch=.25;
+ box.innerHTML=`<h2>${first?'Create your character':'Edit appearance'}</h2>
+ ${first?`<label>Display name <input type="text" id="cname" maxlength="16" value="${S.name.replace(/"/g,'')}"></label>`:''}
+ <label>Skin</label><div>${swatches('skin',LOOK.skin,l.skin)}</div>
+ <label>Hair colour</label><div>${swatches('hair',LOOK.hair,l.hair)}</div>
+ <label>Hair style</label><div>${swatches('hairStyle',LOOK.hairStyle,l.hairStyle,true)}</div>
+ <label>Tunic</label><div>${swatches('shirt',LOOK.shirt,l.shirt)}</div>
+ <label>Cape</label><div>${swatches('cape',LOOK.cape,l.cape)}</div>
+ <p class="small">Drag the world behind this window to turn your character.</p>
+ <p><button class="btn green" id="doneC">${first?'Enter Solscape':'Save'}</button>${first?'':' <button class="btn" id="cancel">Close</button>'}</p>`;
+ modal.classList.add('on');modal.style.background='rgba(0,0,0,.25)';modal.style.justifyContent='flex-start';
+ box.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{S.look[b.dataset.k]=+b.dataset.i;buildPlayer();openCreator(first)});
+ const fin=()=>{if(first){const n=(box.querySelector('#cname').value||'').trim().replace(/[^A-Za-z0-9_ ]/g,'').slice(0,16);if(n.length<2){log('Choose a name of at least 2 characters.','sys');return}S.name=n}save();ui();modal.style.background='';modal.style.justifyContent='';camDist=16;camPitch=.55;closeModal();if(first)log(`Welcome to Solscape, ${S.name}.`,'good')};
+ box.querySelector('#doneC').onclick=fin;const c=box.querySelector('#cancel');if(c)c.onclick=()=>{modal.style.background='';modal.style.justifyContent='';camDist=16;camPitch=.55;closeModal()}}
+function openProfile(){const L=S.lv;const total=Object.values(L).reduce((a,b)=>a+b,0);const days=Math.max(1,Math.round((Date.now()-S.created)/86400000));
+ box.innerHTML=`<h2>Character profile</h2>
+ <label>Display name <input type="text" id="pname" maxlength="16" value="${S.name.replace(/"/g,'')}" pattern="[A-Za-z0-9_ ]+"></label><p class="small">Up to 16 letters, numbers, spaces or underscores. Shown above your head and in fight logs.</p>
+ <div class="stat"><span>Combat level</span><b>${combatLevel()}</b></div><div class="stat"><span>Total level</span><b>${total}</b></div>
+ <div class="stat"><span>Combat style</span><b>${S.style}</b></div><div class="stat"><span>Wallet</span><b>${S.wallet||'not connected'}</b></div>
+ <div class="stat"><span>Holdings</span><b>${fmt(S.scape)} SCAPE · ${S.sol.toFixed(3)} SOL</b></div>
+ <div class="stat"><span>Goblin kills</span><b>${S.kills}</b></div><div class="stat"><span>Raids won / lost</span><b>${S.raids.w} / ${S.raids.l}</b></div><div class="stat"><span>Duels won / lost</span><b>${S.duels.w} / ${S.duels.l}</b></div>
+ <div class="stat"><span>Net SCAPE from combat</span><b>${fmt(S.earned)}</b></div><div class="stat"><span>Days since creation</span><b>${days}</b></div>
+ <p><button class="btn green" id="saveP">Save</button> <button class="btn" id="editLook">Edit appearance</button> <button class="btn" id="cancel">Close</button></p>`;modal.classList.add('on');box.querySelector('#editLook').onclick=()=>openCreator(false);
+ box.querySelector('#cancel').onclick=closeModal;box.querySelector('#saveP').onclick=()=>{const n=box.querySelector('#pname').value.trim().replace(/[^A-Za-z0-9_ ]/g,'').slice(0,16);if(n.length<2){log('Name must be at least 2 characters.','sys');return}S.name=n;save();ui();NET.pushBoard();log(`Your name is now ${n}.`,'good');closeModal()}}
+document.getElementById('profileBtn').onclick=openProfile;
+function closeModal(){modal.classList.remove('on');cv.focus()}
+let B=null;
+function mkFighter(name,cl,style,x,z){const wp=style==='melee'?'sword':style==='ranged'?'bow':'staff';const e={mesh:humanoid({shirt:[0xc0392b,0x8e44ad,0x16a085,0xd35400][Math.floor(Math.random()*4)],cape:Math.random()<.6?[0x1b3d8e,0x2e7d32,0x6a1b9a][Math.floor(Math.random()*3)]:null,helm:style==='melee',weapon:wp}),x,z,hp:cl+9,max:cl+9,att:cl,def:Math.floor(cl*.8),style,name,lvl:cl,maxhit:Math.floor(1.5+cl*.6)};scene.add(e.mesh);return e}
+function startRaid(n){S.scape-=ECON.bossStake;const l=LM.lair;const boss={mesh:bossMesh(),x:l.x+2,z:l.z-4,name:'Solstice Wyrm',boss:true,att:Math.floor(6+combatLevel()*.9),def:Math.floor(4+combatLevel()*.7),maxhit:Math.floor(3+combatLevel()*.35),style:'magic'};boss.hp=boss.max=Math.floor(60*n*(1+combatLevel()/20));scene.add(boss.mesh);
+ const party=[{me:true,name:S.name,hp:S.hp,max:S.maxhp,att:S.lv[offSkill()],def:S.lv.def,style:S.style,x:player.x,z:player.z}];
+ for(let i=1;i<n;i++){const cl=Math.max(3,combatLevel()+Math.floor(Math.random()*10-4));party.push(mkFighter(NAMES[Math.floor(Math.random()*NAMES.length)],cl,['melee','ranged','magic'][i%3],player.x+(i-1.5)*2,player.z+2))}
+ B={mode:'raid',party,foes:[boss],n,over:false};log(`Your party of ${n} enters the lair. ${n*ECON.bossStake} SCAPE staked.`,'sys');drawHud()}
+function startDuel(w){S.scape-=w;const cl=Math.max(3,combatLevel()+Math.floor(Math.random()*6-3));const st=['melee','ranged','magic'][Math.floor(Math.random()*3)];const a=LM.arena;
+ const foe=mkFighter(NAMES[Math.floor(Math.random()*NAMES.length)],cl,st,a.x+(player.x<a.x?2:-2),a.z);foe.def=Math.floor(cl*.85);
+ B={mode:'duel',wager:w,party:[{me:true,name:S.name,hp:S.hp,max:S.maxhp,att:S.lv[offSkill()],def:S.lv.def,style:S.style}],foes:[foe],over:false};log(`${foe.name} (lvl ${cl}, ${st}) accepts your ${w} SCAPE wager. Pot: ${w*2}.`,'sys');drawHud()}
+function battleTick(){if(!B||B.over)return;const foe=B.foes[0];const alive=B.party.filter(p=>p.hp>0);
+ alive.forEach(p=>{let d;const ent=p.me?player:p;lunge(ent,foe);if(p.me){d=playerHit(foe.def,foe.style);if(d){gainXp(offSkill(),d*4);gainXp('hp',Math.ceil(d*1.3))}}else{const m=styleBonus(p.style,foe.style);d=roll(p.att,foe.def,m)?Math.floor(Math.random()*Math.floor(1.5+p.att*.6*m))+1:0}
+  foe.hp=Math.max(0,foe.hp-d);splat(foe,d,foe.boss?5.5:2.2);if(p.me)log(d?`You hit ${foe.name} for ${d}.`:`You miss ${foe.name}.`,d?'dmg':'')});
+ if(foe.hp<=0)return endBattle(true);
+ const tgt=alive[Math.floor(Math.random()*alive.length)];const m=styleBonus(foe.style,tgt.style);const fd=roll(foe.att,tgt.def,m)?Math.floor(Math.random()*Math.floor(foe.maxhit*m))+1:0;tgt.hp=Math.max(0,tgt.hp-fd);lunge(foe,tgt.me?player:tgt);splat(tgt.me?player:tgt,fd);
+ if(tgt.me){S.hp=tgt.hp;log(fd?`${foe.name} hits you for ${fd}.`:`${foe.name} misses you.`,fd?'dmg':'')}
+ if(tgt.hp<=0){log(tgt.me?'You have fallen!':`${tgt.name} has fallen!`,'sys')}
+ if(B.party.every(p=>p.hp<=0))return endBattle(false);
+ if(B.mode==='raid'&&!tgt.me&&tgt.hp>0&&tgt.hp<tgt.max*.35&&Math.random()<.3){tgt.hp=Math.min(tgt.max,tgt.hp+Math.ceil(tgt.max*.4));splat(tgt,'+')}
+ drawHud();ui()}
+function endBattle(win){B.over=true;const me=B.party[0];S.hp=Math.max(1,me.hp);let msg;
+ if(B.mode==='raid'){const staked=B.n*ECON.bossStake;if(win){const share=S.pool*ECON.bossPoolShare;S.pool-=share;const each=(share+staked)/B.n;S.scape+=each;S.earned+=each;S.raids.w++;msg=`The Solstice Wyrm falls. ${fmt(share)} SCAPE claimed from the pool, split ${B.n} ways: ${fmt(each)} SCAPE each.`;log(`Raid won. You receive ${fmt(each)} SCAPE.`,'good')}else{S.pool+=staked;S.raids.l++;msg=`Your party wiped. ${staked} SCAPE in stakes returned to the reward pool.`;log('Raid failed. Stakes returned to the pool.','dmg')}}
+ else{const pot=B.wager*2,rake=pot*ECON.pvpRake;S.pool+=rake;if(win){const p=pot-rake;S.scape+=p;S.earned+=B.wager-rake;S.duels.w++;msg=`You win the duel and take ${fmt(p)} SCAPE (${fmt(rake)} arena fee to the pool).`;log(`Duel won. +${fmt(p)} SCAPE.`,'good')}else{S.duels.l++;msg=`You lose the duel. Your ${B.wager} SCAPE wager goes to ${B.foes[0].name}.`;log('Duel lost.','dmg')}}
+ save();if(window.NET){NET.pushPool();NET.pushBoard()}drawHud();hud.insertAdjacentHTML('beforeend',`<p class="small" style="color:var(--text)">${msg}</p><button class="btn green" id="done">Return to the world</button>`);
+ hud.querySelector('#done').onclick=()=>{[...B.foes,...B.party.slice(1)].forEach(e=>{scene.remove(e.mesh);dropLabel(e)});if(!win){S.hp=S.maxhp;player.x=LM.spawn.x;player.z=LM.spawn.z}else{player.x+= (B.mode==='raid'?-5:0);}B=null;hud.classList.remove('on');near='x';ui();cv.focus()}}
+function drawHud(){const foe=B.foes[0];hud.classList.add('on');hud.innerHTML=`<h3>${B.mode==='raid'?'Raid — '+foe.name:'Duel — pot '+fmt(B.wager*2)+' SCAPE'}</h3>
+ <div class="f"><b>${foe.name}</b> <span class="small">${foe.style}</span><div class="bar foe"><i style="width:${100*foe.hp/foe.max}%"></i></div></div>
+ ${B.party.map(p=>`<div class="f ${p.hp<=0?'dead':''}">${p.name} <span class="small">${p.style}</span><div class="bar"><i style="width:${100*p.hp/p.max}%"></i></div></div>`).join('')}
+ ${B.over?'':`<button class="btn" id="eatB">Eat (${S.food})</button> <span class="small">melee › ranged › magic › melee</span>`}`;const eb=hud.querySelector('#eatB');if(eb)eb.onclick=eat}
+// ================= token =================
+function trade(kind,amt){if(!S.wallet){log('Connect a wallet first.','sys');return}
+ if(kind==='buy'){if(amt>S.sol){log('Not enough SOL.','sys');return}const fee=amt*ECON.tradeFee,tokens=(amt-fee)/S.price;S.sol-=amt;S.scape+=tokens;distribute(fee/S.price);S.price*=1+amt*.02;log(`Bought ${fmt(tokens)} SCAPE for ${amt} SOL. Fee ${fee.toFixed(4)} SOL → pool/treasury.`,'sol')}
+ else{if(amt>S.scape){log('Not enough SCAPE.','sys');return}const out=amt*S.price,fee=out*ECON.tradeFee;S.scape-=amt;S.sol+=out-fee;distribute(amt*ECON.tradeFee);S.price*=Math.max(.5,1-out*.02);log(`Sold ${fmt(amt)} SCAPE for ${(out-fee).toFixed(4)} SOL. Fee ${fee.toFixed(4)} SOL → pool/treasury.`,'sol')}save();if(window.NET)NET.pushPool();ui()}
+function distribute(ft){const p=ft*(ECON.toPool/ECON.tradeFee);S.pool+=p;S.treasury+=ft-p}
+setInterval(()=>{if(window.NET&&NET.db)return;distribute((Math.random()*3*ECON.tradeFee)/S.price);S.price*=1+(Math.random()-.48)*.01;ui()},4000);
+document.getElementById('connectBtn').onclick=()=>{if(S.wallet){S.wallet=null;log('Wallet disconnected.','sys')}else{const a='So1'+Math.random().toString(36).slice(2,8)+'…'+Math.random().toString(36).slice(2,6);S.wallet=a;if(S.scape===0){S.scape=500;log('Welcome to Solscape. 500 SCAPE airdropped to get you started.','good')}log(`Connected ${a} (demo wallet — mainnet build uses Phantom via wallet-adapter).`,'sol')}save();ui()};
+// ================= ui =================
+function setWeapon(){buildPlayer()}
+function switchTab(id){document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===id));['stats','combat','token'].forEach(t=>document.getElementById('tab-'+t).hidden=t!==id)}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+function ui(){document.getElementById('walletTag').textContent=S.wallet?`${S.wallet} · ${S.sol.toFixed(3)} SOL · ${fmt(S.scape)} SCAPE`:'No wallet';document.getElementById('connectBtn').textContent=S.wallet?'Disconnect':'Connect wallet';
+ const st=document.getElementById('tab-stats');st.innerHTML=`<div class="stat"><span>Name</span><b>${S.name}</b></div><div class="stat"><span>Combat level</span><b>${combatLevel()}</b></div><div class="stat"><span>Hitpoints</span><b>${S.hp}/${S.maxhp}</b></div><div class="bar"><i style="width:${100*S.hp/S.maxhp}%"></i></div>`+
+  ['att','str','def','hp','rng','mag'].map(k=>{const cur=S.xp[k]-xpFor(S.lv[k]),need=xpFor(S.lv[k]+1)-xpFor(S.lv[k]);return `<div class="stat"><span>${label(k)}</span><b>${S.lv[k]}</b></div><div class="bar xp"><i style="width:${Math.min(100,100*cur/need)}%"></i></div>`}).join('')+
+  `<div class="stat"><span>Goblin kills</span><b>${S.kills}</b></div><div class="stat"><span>Raids won / lost</span><b>${S.raids.w} / ${S.raids.l}</b></div><div class="stat"><span>Duels won / lost</span><b>${S.duels.w} / ${S.duels.l}</b></div><div class="stat"><span>Net SCAPE from combat</span><b>${fmt(S.earned)}</b></div>`;
+ const cb=document.getElementById('tab-combat');cb.innerHTML=`<p class="small">Your style sets which skill trains and where you sit on the combat triangle.</p>${['melee','ranged','magic'].map(s=>`<button class="btn ${S.style===s?'green':''}" data-style="${s}">${s}</button>`).join(' ')}
+  <div class="stat" style="margin-top:10px"><span>Max hit</span><b>${maxHit()}</b></div><div class="stat"><span>Food (lobsters)</span><b>${S.food}</b></div><p><button class="btn" id="eatBtn">Eat (E)</button> <button class="btn" id="buyFood">5 lobsters · 40 SCAPE</button></p>
+  <p class="small">Raid stake ${ECON.bossStake} · duel minimum ${ECON.pvpMin} · arena fee ${ECON.pvpRake*100}%</p>`;
+ cb.querySelectorAll('[data-style]').forEach(b=>b.onclick=()=>{S.style=b.dataset.style;setWeapon();log(`Combat style set to ${S.style}.`);ui()});cb.querySelector('#eatBtn').onclick=eat;cb.querySelector('#buyFood').onclick=()=>{if(S.scape<40){log('Not enough SCAPE.','sys');return}S.scape-=40;S.food+=5;S.treasury+=40;log('Bought 5 lobsters.');ui()};
+ const tk=document.getElementById('tab-token');tk.innerHTML=`<div class="pool"><div class="small">Reward pool</div><div class="big">${fmt(S.pool)} SCAPE</div><div class="small">Treasury ${fmt(S.treasury)} · price ${S.price.toFixed(7)} SOL · sim. mcap ${(S.price*ECON.supply).toFixed(0)} SOL</div></div>
+  <p class="small">Every buy and sell pays ${ECON.tradeFee*100}%: ${ECON.toPool*100}% to the reward pool that funds raid payouts, ${ECON.toTreasury*100}% to treasury. A winning raid claims ${ECON.bossPoolShare*100}% of the pool.</p>
+  <label>Buy with SOL: <span id="bv">0.25</span><input type="range" id="buyR" min="0.05" max="2" step="0.05" value="0.25"></label><button class="btn sol" id="buyB">Buy SCAPE</button>
+  <label>Sell SCAPE <input type="number" id="sellN" min="1" value="${Math.floor(S.scape/2)||0}"></label><p><button class="btn" id="sellB">Sell SCAPE</button></p>
+  <p class="small">Simulated curve. Live build launches on StonkFun / Raydium LaunchLab with a fee-router program feeding the reward vault.</p>`;
+ const br=tk.querySelector('#buyR');br.oninput=()=>tk.querySelector('#bv').textContent=br.value;tk.querySelector('#buyB').onclick=()=>trade('buy',+br.value);tk.querySelector('#sellB').onclick=()=>trade('sell',Math.floor(+tk.querySelector('#sellN').value))}
+function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+
+// online layer lives in net.js (window.NET)
+document.getElementById('chatIn').addEventListener('keydown',e=>{if(e.key!=='Enter')return;const t=e.target.value.trim().slice(0,140);if(!t)return;e.target.value='';log(`${S.name}: ${t}`);if(NET.room)NET.room.emit('chat',{text:t}).catch(()=>{})});
+document.getElementById('boardBtn').onclick=async()=>{box.innerHTML='<h2>Leaderboard</h2><p class="small">Loading…</p>';modal.classList.add('on');let rows=[];
+ if(NET.db){try{rows=await NET.leaderboard()}catch(e){}}
+ box.innerHTML=`<h2>Leaderboard</h2>${rows.length?rows.map((r,i)=>`<div class="stat"><span>${i+1}. ${String(r.name||'Player').slice(0,16)}</span><b>lvl ${r.combat} · ${r.kills||0} kills · ${r.raidsW||0} raids · ${r.duelsW||0} duels · ${fmt(r.earned||0)} SCAPE</b></div>`).join(''):'<p class="small">'+(NET.db?'No players recorded yet.':'Leaderboard needs the online backend — add your Supabase keys to config.js.')+'</p>'}<p><button class="btn" id="cancel">Close</button></p>`;box.querySelector('#cancel').onclick=closeModal};
+NET.init();
+ui();log('Welcome to Solscape. Click the ground to walk, or use WASD.','sys');cv.focus();requestAnimationFrame(frame);if(!S.look)openCreator(true);
+</script>
+</body>
+</html>
